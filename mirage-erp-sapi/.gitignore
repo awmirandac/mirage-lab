@@ -1,0 +1,10 @@
+exchange_modules/
+.exchange_modules_tmp/
+.apivcs
+.settings
+.tmp
+.mvn
+config.properties
+.vscode
+.exchange.xml
+*.code-workspace
