@@ -1,0 +1,30 @@
+# ---- Build ----
+target/
+*.jar
+*.zip
+
+# ---- Mule runtime local ----
+.mule/
+.mule-*
+mule_credentials.properties
+
+# ---- IDE ----
+.project
+.classpath
+.settings/
+.factorypath
+*.iml
+.idea/
+
+# ---- Sistema ----
+.DS_Store
+Thumbs.db
+
+# ---- Secretos y configuración local  ⚠️ NUNCA versionar ----
+*.local.properties
+secure.properties
+local.properties
+*.jks
+*.p12
+*.pem
+.env
