@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Mirage ERP System API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     System API que expone el inventario de minisplits del ERP de Mirage. (AMC)
 
@@ -11,11 +11,15 @@ info:
   contact:
     name: Equipo de Integraciones Mirage
     email: integraciones@avatar-global.com
+  license:
+    name: Uso interno - AIRPAC / Mirage
+    url: https://anypoint.mulesoft.com/exchange/3ca333df-d6af-409e-a754-ba5de60d0890/mirage-erp-sapi/
 
+# Un host por API, con el patrón <host>/api/<versión> que usa CloudHub y el listener de APIkit (/api/*).
 servers:
-  - url: https://api.mirage.mx/erp/v1
+  - url: https://mirage-erp-sapi.mirage.mx/api/v1
     description: Producción
-  - url: https://api-sandbox.mirage.mx/erp/v1
+  - url: https://mirage-erp-sapi-sandbox.mirage.mx/api/v1
     description: Sandbox
 
 # Ambas credenciales son obligatorias: al ir en el mismo objeto, se exigen en conjunto.
@@ -30,7 +34,7 @@ tags:
 paths:
   /products/{sku}/availability:
     get:
-      operationId: getProductAvailability
+      operationId: get-product-availability
       summary: Consultar disponibilidad
       tags: [ Inventario ]
       description: |
@@ -44,6 +48,7 @@ paths:
           in: path
           required: true
           description: SKU del producto en el catálogo de Mirage.
+          example: MIRAGE-MS-12K
           schema:
             type: string
             pattern: '^MIRAGE-[A-Z0-9-]+$'
@@ -61,6 +66,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -88,6 +95,7 @@ components:
 
     Warehouse:
       type: object
+      additionalProperties: false
       description: Existencia de un SKU en un almacén concreto.
       required: [ code, name, quantity ]
       properties:
@@ -107,6 +115,7 @@ components:
 
     Availability:
       type: object
+      additionalProperties: false
       description: Disponibilidad de un SKU según el inventario del ERP.
       required: [ sku, available, quantity, warehouses, updatedAt ]
       properties:
@@ -154,6 +163,7 @@ components:
 
     Error:
       type: object
+      additionalProperties: false
       description: |
         Formato único de error para todas las APIs de Mirage.
         Candidato natural a convertirse en fragmento reutilizable (módulo 3).
@@ -214,6 +224,24 @@ components:
             code: SKU_NOT_FOUND
             message: No existe el SKU solicitado en el catálogo del ERP.
             timestamp: '2026-09-10T18:30:00Z'
+
+    TooManyRequests:
+      description: Se superó el límite de peticiones permitido para esta credencial.
+      headers:
+        Retry-After:
+          description: Segundos que el cliente debe esperar antes de reintentar.
+          example: 30
+          schema:
+            type: integer
+            example: 30
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: RATE_LIMIT_EXCEEDED
+            message: Se superó el límite de peticiones. Reintente en 30 segundos.
+            timestamp: '2026-09-11T18:30:00Z'
 
     ServerError:
       description: Error no controlado, o el ERP no respondió.

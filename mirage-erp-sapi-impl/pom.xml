@@ -57,7 +57,7 @@
         <dependency>
             <groupId>3ca333df-d6af-409e-a754-ba5de60d0890</groupId>
             <artifactId>mirage-erp-sapi</artifactId>
-            <version>1.0.3</version>
+            <version>1.1.0</version>
             <classifier>oas</classifier>
             <type>zip</type>
         </dependency>

@@ -3,7 +3,7 @@
     <http:listener-config name="mirage-erp-sapi-httpListenerConfig">
         <http:listener-connection host="0.0.0.0" port="8081" />
     </http:listener-config>
-    <apikit:config name="mirage-erp-sapi-config" api="resource::3ca333df-d6af-409e-a754-ba5de60d0890:mirage-erp-sapi:1.0.3:oas:zip:mirage-erp-sapi.yaml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <apikit:config name="mirage-erp-sapi-config" api="resource::3ca333df-d6af-409e-a754-ba5de60d0890:mirage-erp-sapi:1.1.0:oas:zip:mirage-erp-sapi.yaml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
     <flow name="mirage-erp-sapi-main">
         <http:listener config-ref="mirage-erp-sapi-httpListenerConfig" path="/api/*">
             <http:response statusCode="#[vars.httpStatus default 200]">
