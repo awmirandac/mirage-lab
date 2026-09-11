@@ -1,0 +1,11 @@
+# Normaliza finales de línea en el repositorio (LF), independientemente del SO
+# de cada desarrollador. Evita diffs de archivos enteros entre Windows y WSL.
+* text=auto eol=lf
+
+# Archivos binarios: nunca tocar
+*.jar  binary
+*.zip  binary
+*.png  binary
+*.jpg  binary
+*.p12  binary
+*.jks  binary
