@@ -50,3 +50,9 @@ velocity.log
 # ACB defaults #
 # ------------------------------------------------------------------------------ #
 .tooling-project
+# ------------------------------------------------------------------------------ #
+# Muestras automáticas de DataWeave (lorem ipsum). Se regeneran solas y su       #
+# nombre codifica la posición en el XML: nunca versionarlas.                     #
+# Los escenarios con nombre (carpetas hermanas de Playground) SÍ se versionan.   #
+# ------------------------------------------------------------------------------ #
+src/test/resources/embedded-dw_*/Playground/

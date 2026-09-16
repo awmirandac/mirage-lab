@@ -16,13 +16,36 @@
         </http:listener>
         <apikit:router config-ref="mirage-erp-sapi-config" />
         <error-handler>
+            <on-error-propagate type="MIRAGE:SKU_NOT_FOUND">
+                <ee:transform doc:name="Error 404 SKU_NOT_FOUND">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "SKU_NOT_FOUND",
+  message:   error.description,
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ssXXX"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
             <on-error-propagate type="APIKIT:BAD_REQUEST">
                 <ee:transform doc:name="Transform Message">
                     <ee:message>
                         <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
-{message: "Bad request"}]]></ee:set-payload>
+{
+  code:      "INVALID_SKU_FORMAT",
+  message:   "El SKU debe seguir el patrón MIRAGE-XX-NNN.",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ssXXX"},
+  traceId:   correlationId
+}]]></ee:set-payload>
                     </ee:message>
                     <ee:variables>
                         <ee:set-variable variableName="httpStatus">400</ee:set-variable>
@@ -94,6 +117,23 @@ output application/json
                     </ee:variables>
                 </ee:transform>
             </on-error-propagate>
+            <on-error-propagate doc:name="On-error-propagate" type="ANY">
+                <ee:transform doc:name="Transform Message" doc:id="vzeenn" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="egraje" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "ERP_UNAVAILABLE",
+  message:   "El sistema de inventario no está disponible en este momento.",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ssXXX"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <set-variable doc:name="Set variable" doc:id="cceeeg" variableName="httpStatus" value="500"/>
+                
+            </on-error-propagate>
         </error-handler>
     </flow>
     <flow name="mirage-erp-sapi-console">
@@ -124,36 +164,70 @@ output application/json
         </error-handler>
     </flow>
     <flow name="get:\products\(sku)\availability:mirage-erp-sapi-config">
-        <ee:transform doc:name="Transform Message">
+        <ee:transform doc:name="Extraer sku">
             <ee:variables>
-                <ee:set-variable variableName="sku">attributes.uriParams.'sku'</ee:set-variable>
+                <ee:set-variable variableName="sku"><![CDATA[attributes.uriParams.'sku']]></ee:set-variable>
             </ee:variables>
         </ee:transform>
-        <ee:transform doc:name="Transform Message">
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
+        <logger level="INFO" doc:name="Log consulta" message='#["[$(correlationId)] Consultando disponibilidad de $(vars.sku)"]' />
+        <ee:transform doc:name="Consultar ERP simulado">
+            <ee:variables>
+                <ee:set-variable variableName="erpRecord"><![CDATA[%dw 2.0
+output application/java
+// ERP simulado. En el módulo 6 esto se sustituye por una consulta real a base de datos.
+var inventario = {
+  "MIRAGE-MS-12K": {
+    capacityBtu: 12000,
+    updatedAt: "2026-09-15T06:00:00Z",
+    warehouses: [
+      { code: "CDMX-01", name: "Centro de distribución Vallejo", quantity: 9 },
+      { code: "MTY-02",  name: "Bodega Apodaca",                 quantity: 5 }
+    ]
+  },
+  "MIRAGE-MS-18K": {
+    capacityBtu: 18000,
+    updatedAt: "2026-09-15T06:00:00Z",
+    warehouses: [
+      { code: "CDMX-01", name: "Centro de distribución Vallejo", quantity: 3 }
+    ]
+  },
+  "MIRAGE-MS-24K": {
+    capacityBtu: 24000,
+    updatedAt: "2026-09-15T06:00:00Z",
+    warehouses: [
+      { code: "CDMX-01", name: "Centro de distribución Vallejo", quantity: 0 },
+      { code: "MTY-02",  name: "Bodega Apodaca",                 quantity: 0 }
+    ]
+  }
+}
+---
+inventario[vars.sku]]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <choice doc:name="¿Existe el SKU?">
+            <when expression="#[vars.erpRecord == null]">
+                <raise-error type="MIRAGE:SKU_NOT_FOUND" description="#['No existe el SKU ' ++ vars.sku ++ ' en el catálogo del ERP.']" />
+            </when>
+            <otherwise>
+                
+                <ee:transform doc:name="Construir respuesta Availability">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
 output application/json
+var erp   = vars.erpRecord
+var total = sum(erp.warehouses map $.quantity)
 ---
 {
-  sku: "MIRAGE-MS-12K",
-  capacityBtu: 12000,
-  available: true,
-  quantity: 14,
-  warehouses: [
-    {
-      code: "CDMX-01",
-      name: "Centro de distribuci�n Vallejo",
-      quantity: 9
-    }, 
-    {
-      code: "MTY-02",
-      name: "Bodega Apodaca",
-      quantity: 5
-    }
-  ],
-  updatedAt: "2026-09-10T18:30:00Z"
-} as Object {encoding: "UTF-8", mediaType: "application/json"}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
+  sku:         vars.sku,
+  capacityBtu: erp.capacityBtu,
+  available:   total > 0,
+  quantity:    total,
+  warehouses:  erp.warehouses,
+  updatedAt:   erp.updatedAt
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
     </flow>
 </mule>
