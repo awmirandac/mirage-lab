@@ -1,0 +1,20 @@
+# ERP simulado de Mirage: PostgreSQL con inventario de minisplits.
+# Uso:  docker compose up -d        (arrancar)
+#       docker compose down -v      (borrar todo, incluidos datos)
+services:
+  erp-db:
+    image: postgres:16
+    container_name: mirage-erp-db
+    environment:
+      POSTGRES_DB: mirage_erp
+      POSTGRES_USER: mirage
+      POSTGRES_PASSWORD: mirage_dev   # solo desarrollo local; la Mule app NO la lleva en el código
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mirage -d mirage_erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

@@ -1,0 +1,33 @@
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd                           http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd                           http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <!-- Módulo 6.4: llamada saliente a una API pública (tipo de cambio USD → MXN). -->
+    <http:request-config name="frankfurterRequestConfig" basePath="/v1">
+        <http:request-connection protocol="HTTPS" port="443" host="api.frankfurter.dev"></http:request-connection>
+    </http:request-config>
+    <flow name="get-fx-rate">
+        <http:listener config-ref="mirage-erp-sapi-httpListenerConfig" doc:id="liecdw" doc:name="Listener" path="/tools/fx-rate"></http:listener>
+        <set-variable doc:id="xtqdtc" doc:name="Set variable" value="#[attributes.queryParams.to default &quot;MXN&quot;]" variableName="quote"></set-variable>
+        <http:request doc:id="hbfhpt" doc:name="Consultar tipo de cambio" config-ref="frankfurterRequestConfig" path="/latest">
+            <http:query-params><![CDATA[#[output application/java
+---
+{
+	base : "USD",
+	symbols : vars.quote
+}]]]></http:query-params>
+        </http:request>
+        <ee:transform doc:name="Transform Message" doc:id="sajlbt" >
+            <ee:message >
+                <ee:set-payload doc:name="Set payload" doc:id="xgfczw" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  base:   payload.base,
+  quote:  vars.quote,
+  rate:   payload.rates[vars.quote],
+  date:   payload.date,
+  source: "frankfurter.dev (AMC)"
+}
+]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+</mule>

@@ -1,0 +1,8 @@
+{
+  "sku": "MIRAGE-MS-12K",
+  "warehouses": [
+    { "code": "CDMX-01", "name": "Centro de distribución Vallejo", "quantity": 9 },
+    { "code": "MTY-02",  "name": "Bodega Apodaca",                 "quantity": 5 },
+    { "code": "GDL-01",  "name": "Bodega Zapopan",                 "quantity": 0 }
+  ]
+}

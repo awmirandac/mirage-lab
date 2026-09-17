@@ -1,0 +1,61 @@
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd                           http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd                           http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd                           http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+    <!-- Módulo 6.5: feed de inventario por lote. Cada N minutos lee todo el stock y escribe un JSON por almacén. -->
+    <!-- Carpeta de trabajo del feed: todo path relativo en file:write cuelga de aquí. -->
+    <file:config doc:name="Carpeta de feeds" name="feedFileConfig">
+        <file:connection workingDir="${feed.dir}"></file:connection>
+    </file:config>
+    <flow name="feed-inventario">
+        <scheduler doc:name="Scheduler" doc:id="fjxmfp">
+            <scheduling-strategy>
+                <fixed-frequency timeUnit="MINUTES" frequency="${feed.frequency.minutes}"/>
+            </scheduling-strategy>
+        </scheduler>
+        <logger doc:name="Inicio feed" doc:id="bzrtxj" message='#[ "[$(correlationId)] Generando feed de inventario"]'/>
+        <db:select doc:name="Leer todo el stock" doc:id="amfbxq" config-ref="erpDbConfig">
+            <db:sql><![CDATA[SELECT p.sku, p.name AS product_name, p.capacity_btu,
+       s.warehouse_code, w.name AS warehouse_name, s.quantity
+FROM stock s
+JOIN products p ON p.sku = s.sku
+JOIN warehouses w ON w.code = s.warehouse_code
+ORDER BY s.warehouse_code, p.sku]]></db:sql>
+        </db:select>
+        <ee:transform doc:name="Agrupar por almacén" doc:id="igmrfr" >
+            <ee:message >
+                <ee:set-payload doc:name="Set payload" doc:id="wzckll" ><![CDATA[%dw 2.0
+output application/java
+---
+payload groupBy $.warehouse_code
+  pluck (rows, code) -> {
+    code:  code as String,
+    name:  rows[0].warehouse_name,
+    items: rows map {
+      sku:         $.sku,
+      name:        $.product_name,
+      capacityBtu: $.capacity_btu,
+      quantity:    $.quantity
+    }
+  }]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <foreach doc:name="Por cada almacén" doc:id="eptcpj">
+            <ee:transform doc:name="Armar feed del almacén" doc:id="guskpz" >
+                <ee:message >
+                    <ee:set-payload doc:name="Set payload" doc:id="lrhssr" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  feed:        "inventory",
+  warehouse:   { code: payload.code, name: payload.name },
+  generatedAt: now() as String {format: "yyyy-MM-dd'T'HH:mm:ssXXX"},
+  totalItems:  sizeOf(payload.items),
+  items:       payload.items
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            <file:write doc:name="Escribir JSON" doc:id="ykyfrs" path='#["feed-inventario-" ++ payload.warehouse.code ++ ".json"]' config-ref="feedFileConfig"/>
+            <logger doc:name="Feed escrito" doc:id="dmvcod" message='#[output text/plain --- "[$(correlationId)] Feed escrito: $(payload.warehouse.code) con $(payload.totalItems) productos"
+]'/>
+            
+        </foreach>
+        <logger doc:name="Feed completo" doc:id="epxpmc" message='#["[$(correlationId)] Feed completo: $(sizeOf(payload)) almacenes"]'/></flow>
+</mule>

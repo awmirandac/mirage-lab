@@ -22,9 +22,12 @@ Thumbs.db
 
 # ---- Secretos y configuración local  ⚠️ NUNCA versionar ----
 *.local.properties
-secure.properties
+# secure.properties SÍ se versiona: sus valores van cifrados (![...]) y la clave nunca está en el repo
 local.properties
 *.jks
 *.p12
 *.pem
 .env
+
+# ---- Salida generada por el feed de inventario (módulo 6.5) ----
+feeds/

@@ -1,0 +1,7 @@
+[
+  { "sku": "MIRAGE-MS-12K", "capacityBtu": 12000, "line": "MS" },
+  { "sku": "MIRAGE-MX-12K", "capacityBtu": 12000, "line": "MX" },
+  { "sku": "MIRAGE-MS-18K", "capacityBtu": 18000, "line": "MS" },
+  { "sku": "MIRAGE-MS-24K", "capacityBtu": 24000, "line": "MS" },
+  { "sku": "MIRAGE-MX-24K", "capacityBtu": 24000, "line": "MX" }
+]
