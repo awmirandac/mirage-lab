@@ -1,5 +1,5 @@
 <mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd   http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
-    <!-- Propiedades: config.properties se versiona; local.properties (secretos) no. -->
+    <!-- Propiedades en claro. Los secretos van cifrados en secure.properties (ver secureProps). -->
     <configuration-properties doc:name="Configuration properties" file="config.properties"></configuration-properties>
     <!-- Secretos cifrados (módulo 6.6). La clave NO vive en el proyecto: llega como -M-Dencryption.key al arrancar. -->
     <secure-properties:config name="secureProps" doc:name="Secure properties" file="secure.properties" key="${encryption.key}">
@@ -150,7 +150,8 @@ output application/json
             </on-error-propagate>
         </error-handler>
     </flow>
-    <flow name="mirage-erp-sapi-console">
+    <!-- Consola APIkit: started en local, stopped en la nube (property api.console.state). -->
+    <flow name="mirage-erp-sapi-console" initialState="${api.console.state}">
         <http:listener config-ref="mirage-erp-sapi-httpListenerConfig" path="/console/*">
             <http:response statusCode="#[vars.httpStatus default 200]">
                 <http:headers>#[vars.outboundHeaders default {}]</http:headers>

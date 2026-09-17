@@ -1,0 +1,11 @@
+{
+  "applicationName": "mirage-erp-sapi",
+  "runtime": "4.12.3:4e-java17",
+  "replicas": 1,
+  "replicaSize": "0.1",
+  "deploymentModel": "rolling",
+  "properties": {
+    "feed.dir": "/tmp/feeds",
+    "api.console.state": "stopped"
+  }
+}
