@@ -11,6 +11,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <app.runtime>4.12.3</app.runtime>
         <mule.maven.plugin.version>4.10.0</mule.maven.plugin.version>
+        <munit.version>3.7.1</munit.version>
     </properties>
     <build>
         <plugins>
@@ -32,6 +33,44 @@
                         </sharedLibrary>
                     </sharedLibraries>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.mulesoft.munit.tools</groupId>
+                <artifactId>munit-maven-plugin</artifactId>
+                <version>${munit.version}</version>
+                <configuration>
+                    <!-- MUnit elige un puerto libre y lo inyecta como ${http.port} durante los tests -->
+                    <dynamicPorts>
+                        <dynamicPort>http.port</dynamicPort>
+                    </dynamicPorts>
+                    <!-- La clave de cifrado NO está aquí: llega como -Dencryption.key al invocar Maven
+                         (ACB: munit.runtime.defaultArguments; CI: secreto del pipeline) y se reenvía al runtime. -->
+                    <systemPropertyVariables>
+                        <encryption.key>${encryption.key}</encryption.key>
+                    </systemPropertyVariables>
+                    <!-- Cobertura: reporte navegable en target/site/munit/coverage/summary.html.
+                         failBuild=false por ahora; cuando el equipo fije umbrales, se activa. -->
+                    <coverage>
+                        <runCoverage>true</runCoverage>
+                        <failBuild>false</failBuild>
+                        <requiredApplicationCoverage>70</requiredApplicationCoverage>
+                        <requiredResourceCoverage>50</requiredResourceCoverage>
+                        <requiredFlowCoverage>40</requiredFlowCoverage>
+                        <formats>
+                            <format>html</format>
+                            <format>json</format>
+                        </formats>
+                    </coverage>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -108,6 +147,20 @@
             <artifactId>mule-secure-configuration-property-module</artifactId>
             <version>1.2.7</version>
             <classifier>mule-plugin</classifier>
+        </dependency>
+        <dependency>
+            <groupId>com.mulesoft.munit</groupId>
+            <artifactId>munit-runner</artifactId>
+            <version>${munit.version}</version>
+            <classifier>mule-plugin</classifier>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mulesoft.munit</groupId>
+            <artifactId>munit-tools</artifactId>
+            <version>${munit.version}</version>
+            <classifier>mule-plugin</classifier>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

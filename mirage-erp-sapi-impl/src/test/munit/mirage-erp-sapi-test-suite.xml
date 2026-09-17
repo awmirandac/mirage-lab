@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+
+    <!-- Caminos felices del endpoint: se ejecuta el flujo por flow-ref, con el ERP simulado. -->
+    <munit:config name="mirage-erp-sapi-test-suite.xml"/>
+
+    <munit:test name="sku-con-stock-devuelve-200"
+                description="Con filas del ERP, la API arma Availability con stock total y available=true">
+
+        <munit:behavior>
+            <munit-tools:mock-when doc:name="Simular ERP con 2 almacenes" processor="db:select">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Consultar inventario en ERP"/>
+                </munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:payload mediaType="application/java" value="#[[
+                        { sku: 'MIRAGE-TEST-1', capacity_btu: 12000, updated_at: |2026-09-14T06:00:00|, warehouse_code: 'CDMX-01', warehouse_name: 'Centro de distribucion Vallejo', quantity: 9 },
+                        { sku: 'MIRAGE-TEST-1', capacity_btu: 12000, updated_at: |2026-09-14T06:00:00|, warehouse_code: 'MTY-02',  warehouse_name: 'Bodega Apodaca',                quantity: 5 }
+                    ]]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <munit:set-event doc:name="Peticion GET con sku">
+                <munit:attributes value="#[{ uriParams: { sku: 'MIRAGE-TEST-1' } }]"/>
+            </munit:set-event>
+            <flow-ref doc:name="Ejecutar endpoint" name="get:\products\(sku)\availability:mirage-erp-sapi-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that doc:name="sku correcto"     expression="#[payload.sku]"                is="#[MunitTools::equalTo('MIRAGE-TEST-1')]"/>
+            <munit-tools:assert-that doc:name="quantity = 14"    expression="#[payload.quantity]"           is="#[MunitTools::equalTo(14)]"/>
+            <munit-tools:assert-that doc:name="available = true" expression="#[payload.available]"          is="#[MunitTools::equalTo(true)]"/>
+            <munit-tools:assert-that doc:name="2 almacenes"      expression="#[sizeOf(payload.warehouses)]" is="#[MunitTools::equalTo(2)]"/>
+            <munit-tools:verify-call doc:name="El ERP se consulto exactamente una vez" processor="db:select" times="1">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute attributeName="doc:name" whereValue="Consultar inventario en ERP"/>
+                </munit-tools:with-attributes>
+            </munit-tools:verify-call>
+        </munit:validation>
+    </munit:test>
+
+</mule>
