@@ -5,7 +5,8 @@
   "replicaSize": "0.1",
   "deploymentModel": "rolling",
   "properties": {
-    "feed.dir": "/tmp/feeds",
-    "api.console.state": "stopped"
+    "feed.dir": "/tmp",
+    "api.console.state": "stopped",
+    "api.id": "21182046"
   }
 }

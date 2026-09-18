@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>3ca333df-d6af-409e-a754-ba5de60d0890</groupId>
     <artifactId>mirage-erp-sapi-impl</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <packaging>mule-application</packaging>
     <name>mirage</name>
     <properties>
@@ -47,6 +47,8 @@
                          (ACB: munit.runtime.defaultArguments; CI: secreto del pipeline) y se reenvía al runtime. -->
                     <systemPropertyVariables>
                         <encryption.key>${encryption.key}</encryption.key>
+                        <!-- Los tests no hablan con API Manager: sin esto el Gatekeeper bloquearía la API con 503 -->
+                        <anypoint.platform.gatekeeper>disabled</anypoint.platform.gatekeeper>
                     </systemPropertyVariables>
                     <!-- Cobertura: reporte navegable en target/site/munit/coverage/summary.html.
                          failBuild=false por ahora; cuando el equipo fije umbrales, se activa. -->
