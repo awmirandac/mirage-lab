@@ -1,7 +1,21 @@
 {
   "folders": [
-    { "name": "mirage-erp-sapi",      "path": "mirage-erp-sapi" },
-    { "name": "mirage-erp-sapi-impl", "path": "mirage-erp-sapi-impl" }
+    {
+      "name": "mirage-erp-sapi",
+      "path": "mirage-erp-sapi"
+    },
+    {
+      "name": "mirage-erp-sapi-impl",
+      "path": "mirage-erp-sapi-impl"
+    },
+    {
+      "name": "mirage-logistics-sapi",
+      "path": "mirage-logistics-sapi"
+    },
+    {
+      "name": "mirage-logistics-sapi-impl",
+      "path": "mirage-logistics-sapi-impl"
+    }
   ],
   "settings": {
     "git.openRepositoryInParentFolders": "always",

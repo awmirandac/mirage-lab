@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+    <!-- Propiedades en claro. Los secretos (si los hubiera) irían cifrados en secure.properties. -->
+    <configuration-properties doc:name="Configuration properties" file="config.properties"/>
+    <http:listener-config name="mirage-logistics-sapi-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="${http.port}" />
+    </http:listener-config>
+    <apikit:config name="mirage-logistics-sapi-config" api="resource::3ca333df-d6af-409e-a754-ba5de60d0890:mirage-logistics-sapi:1.0.0:oas:zip:mirage-logistics-sapi.yaml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <flow name="mirage-logistics-sapi-main">
+        <http:listener config-ref="mirage-logistics-sapi-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="mirage-logistics-sapi-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "INVALID_WAREHOUSE_CODE",
+  message:   "El código debe seguir el patrón XXX-NN o XXXX-NN.",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate doc:name="404 almacén" type="MIRAGE:WAREHOUSE_NOT_FOUND">
+                <ee:transform doc:name="Error 404" doc:id="yhvgdt" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="cmhefn" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "WAREHOUSE_NOT_FOUND",
+  message:   error.description,
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <set-variable doc:name="Set variable" doc:id="yzsnqj" variableName="httpStatus" value="404"/>
+                
+            </on-error-propagate>
+            <on-error-propagate doc:name="ANY" type="ANY">
+                <ee:transform doc:name="Error 500" doc:id="feazfk" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="roegsd" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "LOGISTICS_UNAVAILABLE",
+  message:   "El sistema de logística no está disponible en este momento.",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+                <set-variable doc:name="Set variable" doc:id="oqokuo" variableName="httpStatus" value="500"/>
+                
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="mirage-logistics-sapi-console">
+        <http:listener config-ref="mirage-logistics-sapi-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="mirage-logistics-sapi-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="get:\warehouses\(code)\lead-time:mirage-logistics-sapi-config">
+        <set-variable doc:name="Set variable" doc:id="hvnubu" variableName="code" value="#[attributes.uriParams.code]"/>
+        <ee:transform doc:name="Consultar logística" doc:id="emnobp" >
+            <ee:message >
+                <ee:set-payload doc:name="Set payload" doc:id="vuqovm" ><![CDATA[%dw 2.0
+output application/java
+var almacenes = {
+  "CDMX-01": { carrier: "Estafeta", leadTimeDays: 2, cutoffTime: "14:00" },
+  "MTY-02":  { carrier: "DHL",      leadTimeDays: 1, cutoffTime: "13:00" },
+  "GDL-01":  { carrier: "FedEx",    leadTimeDays: 3, cutoffTime: "15:00" }
+}
+---
+almacenes[vars.code]
+]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <choice doc:name="¿Existe el almacén?" doc:id="bdmxgk">
+            
+        <when doc:name="#[isEmpty(payload)]" expression="#[isEmpty(payload)]">
+                <raise-error doc:name="MIRAGE:WAREHOUSE_NOT_FOUND" doc:id="vpuxqk" type="MIRAGE:WAREHOUSE_NOT_FOUND" description="#['No existe el almacén ' ++ vars.code ++ '.']"/></when>
+            <otherwise>
+                <ee:transform doc:name="Construir LeadTime" doc:id="dnuitr" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="vmjvep" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  warehouseCode: vars.code,
+  leadTimeDays:  payload.leadTimeDays,
+  carrier:       payload.carrier,
+  cutoffTime:    payload.cutoffTime
+}
+]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise></choice>
+        
+        
+    </flow>
+</mule>

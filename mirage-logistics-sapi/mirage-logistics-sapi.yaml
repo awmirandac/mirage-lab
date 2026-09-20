@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Mirage Logistics System API
+  version: v1
+  description: |
+    System API sobre el sistema de logística de Mirage. Expone el tiempo de entrega (lead time)
+    por almacén. Capa **System**: sin lógica de negocio, solo traducción del sistema origen.
+  contact:
+    name: Equipo de Integraciones Mirage
+    email: integraciones@avatar-global.com
+  license:
+    name: Proprietary
+    url: https://mirage.mx/legal
+tags:
+  - name: Logistica
+    description: Tiempos de entrega y transportistas por almacén.
+servers:
+  - url: https://mirage-logistics-sapi.mirage.mx/api
+paths:
+  /warehouses/{code}/lead-time:
+    get:
+      operationId: get-warehouse-lead-time
+      tags: [Logistica]
+      summary: Tiempo de entrega desde un almacén
+      description: Días hábiles que tarda un envío desde el almacén indicado, y transportista asignado.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Código del almacén (p. ej. CDMX-01, MTY-02, GDL-01)
+          schema:
+            type: string
+            pattern: '^[A-Z]{3,4}-[0-9]{2}$'
+          example: CDMX-01
+      responses:
+        '200':
+          description: Lead time del almacén
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadTime'
+              example:
+                warehouseCode: CDMX-01
+                leadTimeDays: 2
+                carrier: Estafeta
+                cutoffTime: "14:00"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    clientId:
+      type: apiKey
+      in: header
+      name: client_id
+    clientSecret:
+      type: apiKey
+      in: header
+      name: client_secret
+  schemas:
+    LeadTime:
+      type: object
+      additionalProperties: false
+      required: [warehouseCode, leadTimeDays, carrier, cutoffTime]
+      properties:
+        warehouseCode:
+          type: string
+          example: CDMX-01
+        leadTimeDays:
+          type: integer
+          minimum: 0
+          description: Días hábiles de entrega
+          example: 2
+        carrier:
+          type: string
+          example: Estafeta
+        cutoffTime:
+          type: string
+          description: Hora límite (local) para que el pedido salga el mismo día
+          example: "14:00"
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: string
+          example: WAREHOUSE_NOT_FOUND
+        message:
+          type: string
+          example: No existe el almacén XYZ-99.
+        timestamp:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+  responses:
+    BadRequest:
+      description: Código de almacén inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_WAREHOUSE_CODE
+            message: El código debe seguir el patrón XXX-NN o XXXX-NN.
+            timestamp: "2026-09-18T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    Unauthorized:
+      description: Credenciales ausentes o inválidas
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Credenciales ausentes o inválidas.
+            timestamp: "2026-09-18T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    NotFound:
+      description: Almacén inexistente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: WAREHOUSE_NOT_FOUND
+            message: No existe el almacén XYZ-99.
+            timestamp: "2026-09-18T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    TooManyRequests:
+      description: Cuota excedida
+      headers:
+        Retry-After:
+          description: Segundos a esperar antes de reintentar
+          schema:
+            type: integer
+            example: 60
+          example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: QUOTA_EXCEEDED
+            message: Cuota excedida; reintenta en 60 segundos.
+            timestamp: "2026-09-18T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    InternalError:
+      description: Sistema de logística no disponible
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: LOGISTICS_UNAVAILABLE
+            message: El sistema de logística no está disponible en este momento.
+            timestamp: "2026-09-18T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+security:
+  - clientId: []
+    clientSecret: []
