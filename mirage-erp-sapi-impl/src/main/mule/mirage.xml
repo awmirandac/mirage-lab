@@ -2,7 +2,7 @@
     <!-- Propiedades en claro. Los secretos van cifrados en secure.properties (ver secureProps). -->
     <configuration-properties doc:name="Configuration properties" file="config.properties"></configuration-properties>
     <!-- Secretos cifrados (módulo 6.6). La clave NO vive en el proyecto: llega como -M-Dencryption.key al arrancar. -->
-    <secure-properties:config name="secureProps" doc:name="Secure properties" file="secure.properties" key="${encryption.key}">
+    <secure-properties:config name="secureProps" doc:name="Secure properties" file="secure-${env}.properties" key="${encryption.key}">
         <secure-properties:encrypt algorithm="AES" mode="CBC"/>
     </secure-properties:config>
     <!-- Autodiscovery (módulo 9): al arrancar, la app se registra en API Manager como la instance ${api.id}
@@ -13,7 +13,7 @@
     </http:listener-config>
     <apikit:config api="resource::3ca333df-d6af-409e-a754-ba5de60d0890:mirage-erp-sapi:1.1.0:oas:zip:mirage-erp-sapi.yaml" httpStatusVarName="httpStatus" name="mirage-erp-sapi-config" outboundHeadersMapName="outboundHeaders"></apikit:config>
     <db:config name="erpDbConfig" doc:name="ERP simulado (PostgreSQL)">
-        <db:generic-connection url="jdbc:postgresql://${db.host}:${db.port}/${db.name}"
+        <db:generic-connection url="jdbc:postgresql://${db.host}:${db.port}/${db.name}?sslmode=${db.sslmode}"
                                driverClassName="org.postgresql.Driver"
                                user="${db.user}"
                                password="${secure::db.password}" />

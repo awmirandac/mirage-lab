@@ -15,6 +15,10 @@
     {
       "name": "mirage-logistics-sapi-impl",
       "path": "mirage-logistics-sapi-impl"
+    },
+    {
+      "name": "mirage-availability-papi",
+      "path": "mirage-availability-papi"
     }
   ],
   "settings": {

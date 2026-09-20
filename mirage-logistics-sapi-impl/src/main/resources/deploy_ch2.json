@@ -1,0 +1,12 @@
+{
+  "applicationName": "mirage-logistics-sapi",
+  "runtime": "4.12.3:4e-java17",
+  "replicas": 1,
+  "replicaSize": "0.1",
+  "deploymentModel": "rolling",
+  "properties": {
+    "http.port": "8081",
+    "api.console.state": "stopped",
+    "api.id": "21185831"
+  }
+}

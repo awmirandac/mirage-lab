@@ -7,6 +7,12 @@
   "properties": {
     "feed.dir": "/tmp",
     "api.console.state": "stopped",
-    "api.id": "21182046"
+    "api.id": "21182046",
+    "db.host": "ep-frosty-dust-b4f2g42w.c-6.us-east-2.aws.neon.tech",
+    "db.port": "5432",
+    "db.name": "mirage_erp",
+    "db.user": "mirage_erp_owner",
+    "db.sslmode": "require",
+    "env": "cloud"
   }
 }

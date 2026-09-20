@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Mirage Availability Process API
+  version: v1
+  description: |
+    Process API de disponibilidad. Orquesta **mirage-erp-sapi** (stock por almacén) y
+    **mirage-logistics-sapi** (tiempo de entrega) y aplica la regla de negocio: elige el almacén
+    que surte el pedido y calcula la promesa de entrega. Capa **Process**: aquí vive la regla,
+    igual para todos los canales.
+  contact:
+    name: Equipo de Integraciones Mirage
+    email: integraciones@avatar-global.com
+  license:
+    name: Proprietary
+    url: https://mirage.mx/legal
+tags:
+  - name: Disponibilidad
+    description: Disponibilidad consolidada con promesa de entrega.
+servers:
+  - url: https://mirage-availability-papi.mirage.mx/api
+paths:
+  /availability/{sku}:
+    get:
+      operationId: get-availability
+      tags: [Disponibilidad]
+      summary: Disponibilidad consolidada de un producto
+      description: |
+        Combina el stock del ERP con el tiempo de entrega del almacén elegido.
+        Regla: se surte desde el almacén con más existencias; si no hay stock en ninguno,
+        `available` es `false` y no hay promesa de entrega.
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          description: SKU del producto
+          schema:
+            type: string
+            pattern: '^MIRAGE-[A-Z0-9-]+$'
+          example: MIRAGE-MS-12K
+      responses:
+        '200':
+          description: Disponibilidad consolidada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+              example:
+                sku: MIRAGE-MS-12K
+                available: true
+                quantity: 14
+                fulfilledFrom:
+                  code: CDMX-01
+                  quantity: 9
+                delivery:
+                  leadTimeDays: 2
+                  carrier: Estafeta
+                  cutoffTime: "14:00"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    clientId:
+      type: apiKey
+      in: header
+      name: client_id
+    clientSecret:
+      type: apiKey
+      in: header
+      name: client_secret
+  schemas:
+    Availability:
+      type: object
+      additionalProperties: false
+      required: [sku, available, quantity]
+      properties:
+        sku:
+          type: string
+          example: MIRAGE-MS-12K
+        available:
+          type: boolean
+          description: Hay existencias en al menos un almacén
+          example: true
+        quantity:
+          type: integer
+          description: Existencias totales sumando todos los almacenes
+          example: 14
+        fulfilledFrom:
+          $ref: '#/components/schemas/Warehouse'
+        delivery:
+          $ref: '#/components/schemas/Delivery'
+    Warehouse:
+      type: object
+      additionalProperties: false
+      required: [code, quantity]
+      description: Almacén elegido para surtir el pedido
+      properties:
+        code:
+          type: string
+          example: CDMX-01
+        quantity:
+          type: integer
+          example: 9
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [leadTimeDays, carrier]
+      description: Promesa de entrega desde el almacén elegido
+      properties:
+        leadTimeDays:
+          type: integer
+          example: 2
+        carrier:
+          type: string
+          example: Estafeta
+        cutoffTime:
+          type: string
+          example: "14:00"
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: string
+          example: PRODUCT_NOT_FOUND
+        message:
+          type: string
+          example: No existe el SKU MIRAGE-XX-99.
+        timestamp:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+  responses:
+    BadRequest:
+      description: SKU con formato inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_SKU_FORMAT
+            message: El SKU debe seguir el patrón MIRAGE-XX-NNN.
+            timestamp: "2026-09-20T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    Unauthorized:
+      description: Credenciales ausentes o inválidas
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Credenciales ausentes o inválidas.
+            timestamp: "2026-09-20T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    NotFound:
+      description: SKU inexistente en el catálogo
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PRODUCT_NOT_FOUND
+            message: No existe el SKU MIRAGE-XX-99.
+            timestamp: "2026-09-20T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    TooManyRequests:
+      description: Cuota excedida
+      headers:
+        Retry-After:
+          description: Segundos a esperar antes de reintentar
+          schema:
+            type: integer
+            example: 60
+          example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: QUOTA_EXCEEDED
+            message: Cuota excedida; reintenta en 60 segundos.
+            timestamp: "2026-09-20T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    InternalError:
+      description: Un sistema de origen no está disponible
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UPSTREAM_UNAVAILABLE
+            message: No fue posible consultar la disponibilidad en este momento.
+            timestamp: "2026-09-20T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+security:
+  - clientId: []
+    clientSecret: []
