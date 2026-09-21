@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway" xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+    <!-- Propiedades en claro (URLs de las System APIs, client_id de la PAPI). -->
+    <configuration-properties doc:name="Configuration properties" file="config.properties"/>
+    <!-- Secreto: client_secret con el que la PAPI consume las System APIs. Cifrado; la clave llega como system property. -->
+    <secure-properties:config name="secureProps" doc:name="Secure properties" file="secure-${env}.properties" key="${encryption.key}">
+        <secure-properties:encrypt algorithm="AES" mode="CBC"/>
+    </secure-properties:config>
+    <!-- Autodiscovery: se completa con el API Instance ID cuando exista la instance en API Manager. -->
+    <api-gateway:autodiscovery apiId="${api.id}" flowRef="mirage-availability-papi-main" doc:name="API Autodiscovery"/>
+    <http:listener-config name="mirage-availability-papi-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="${http.port}" />
+    </http:listener-config>
+    <!-- System APIs que consume esta Process API. Host/puerto/protocolo por property (local vs nube);
+         las credenciales del consumidor van como default headers: viajan en TODAS las llamadas de ese config. -->
+    <http:request-config name="erpRequestConfig" doc:name="mirage-erp-sapi" basePath="/api">
+        <http:request-connection protocol="${erp.protocol}" host="${erp.host}" port="${erp.port}"/>
+        <http:default-headers>
+            <http:default-header key="client_id" value="${papi.client.id}"/>
+            <http:default-header key="client_secret" value="${secure::papi.client.secret}"/>
+        </http:default-headers>
+    </http:request-config>
+    <http:request-config name="logisticsRequestConfig" doc:name="mirage-logistics-sapi" basePath="/api">
+        <http:request-connection protocol="${logistics.protocol}" host="${logistics.host}" port="${logistics.port}"/>
+        <http:default-headers>
+            <http:default-header key="client_id" value="${papi.client.id}"/>
+            <http:default-header key="client_secret" value="${secure::papi.client.secret}"/>
+        </http:default-headers>
+    </http:request-config>
+    <apikit:config name="mirage-availability-papi-config" api="resource::3ca333df-d6af-409e-a754-ba5de60d0890:mirage-availability-papi:1.0.0:oas:zip:mirage-availability-papi.yaml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <flow name="mirage-availability-papi-main">
+        <http:listener config-ref="mirage-availability-papi-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="mirage-availability-papi-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "INVALID_SKU_FORMAT",
+  message:   "El SKU debe seguir el patrón MIRAGE-XX-NNN.",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate doc:name="404 producto" type="HTTP:NOT_FOUND">
+                <ee:transform doc:name="Transform Message" doc:id="gdoqkt" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="fxgcot" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "PRODUCT_NOT_FOUND",
+  message:   "No existe el SKU " ++ vars.sku ++ ".",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  traceId:   correlationId
+}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+                    </ee:variables>            
+                </ee:transform>
+                
+            </on-error-propagate>
+            <on-error-propagate doc:name="500 upstream" type="ANY">
+                <ee:transform doc:name="Transform Message" doc:id="jwmofc" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="tzxeah" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  code:      "UPSTREAM_UNAVAILABLE",
+  message:   "No fue posible consultar la disponibilidad en este momento.",
+  timestamp: now() as String {format: "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+  traceId:   correlationId
+}
+]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+                    </ee:variables>            
+                </ee:transform>
+                
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="mirage-availability-papi-console" initialState="${api.console.state}">
+        <http:listener config-ref="mirage-availability-papi-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="mirage-availability-papi-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="get:\availability\(sku):mirage-availability-papi-config">
+        <set-variable doc:name="sku" doc:id="ujgyco" variableName="sku" value="#[attributes.uriParams.sku]"/>
+        <http:request doc:name="Consultar ERP" doc:id="ywgywp" config-ref="erpRequestConfig" path='#["/products/" ++ vars.sku ++ "/availability"]'/>
+        <set-variable doc:name="Set variable" doc:id="rjgufz" variableName="erp" value="#[payload]"/>
+        <choice doc:name="¿Hay stock?" doc:id="nsrszf">
+            
+        
+      
+            <when doc:name="vars.erp.available" expression="#[vars.erp.available]">
+                <set-variable doc:name="el almacén con más stock" doc:id="ldmqdb" variableName="fulfilledFrom" value="#[vars.erp.warehouses maxBy $.quantity]"/>
+                <http:request doc:name="Consultar logística" doc:id="xcsjdr" config-ref="logisticsRequestConfig" path='#["/warehouses/" ++ vars.fulfilledFrom.code ++ "/lead-time"]'/>
+                <ee:transform doc:name="Construir Availability" doc:id="huppoi" >
+                    <ee:message >
+                        <ee:set-payload doc:name="Set payload" doc:id="eyvslw" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  sku:       vars.sku,
+  available: true,
+  quantity:  vars.erp.quantity,
+  fulfilledFrom: { code: vars.fulfilledFrom.code, quantity: vars.fulfilledFrom.quantity },
+  delivery:  { leadTimeDays: payload.leadTimeDays, carrier: payload.carrier, cutoffTime: payload.cutoffTime }
+}]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when><otherwise>
+          <ee:transform doc:name="Sin existencias" doc:id="qivobp" >
+                              <ee:message >
+                                  <ee:set-payload doc:name="Set payload" doc:id="wlkbyy" ><![CDATA[%dw 2.0
+          output application/json
+          ---
+          { sku: vars.sku, available: false, quantity: 0 }]]></ee:set-payload>
+                              </ee:message>
+                          </ee:transform>
+      </otherwise></choice>
+        
+        
+    </flow>
+</mule>

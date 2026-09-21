@@ -19,6 +19,18 @@
     {
       "name": "mirage-availability-papi",
       "path": "mirage-availability-papi"
+    },
+    {
+      "name": "mirage-availability-papi-impl",
+      "path": "mirage-availability-papi-impl"
+    },
+    {
+      "name": "mirage-storefront-xapi",
+      "path": "mirage-storefront-xapi"
+    },
+    {
+      "name": "mirage-storefront-xapi-impl",
+      "path": "mirage-storefront-xapi-impl"
     }
   ],
   "settings": {

@@ -1,0 +1,18 @@
+{
+  "main": "mirage-storefront-xapi.yaml",
+  "name": "Mirage Storefront Experience API",
+  "classifier": "oas",
+  "tags": [
+    "experience",
+    "mirage",
+    "api-prueba-amc"
+  ],
+  "descriptorVersion": "1.0.0",
+  "organizationId": "3ca333df-d6af-409e-a754-ba5de60d0890",
+  "apiVersion": "v1",
+  "originalFormatVersion": "3.0",
+  "categories": [],
+  "groupId": "3ca333df-d6af-409e-a754-ba5de60d0890",
+  "assetId": "mirage-storefront-xapi",
+  "version": "1.0.0"
+}

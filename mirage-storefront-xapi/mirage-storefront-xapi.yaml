@@ -1,0 +1,183 @@
+openapi: 3.0.3
+info:
+  title: Mirage Storefront Experience API
+  version: v1
+  description: |
+    Experience API para el storefront web (Salesforce Commerce Cloud / SFRA). Expone la disponibilidad
+    de un producto **en el vocabulario que necesita la página de producto**: un texto listo para mostrar,
+    un indicador de stock y una fecha estimada. Capa **Experience**: adapta la Process API a un canal;
+    no contiene reglas de negocio.
+  contact:
+    name: Equipo de Integraciones Mirage
+    email: integraciones@avatar-global.com
+  license:
+    name: Proprietary
+    url: https://mirage.mx/legal
+tags:
+  - name: Producto
+    description: Información de producto para la página de detalle (PDP).
+servers:
+  - url: https://mirage-storefront-xapi.mirage.mx/api
+paths:
+  /products/{sku}/summary:
+    get:
+      operationId: get-product-summary
+      tags: [Producto]
+      summary: Resumen de disponibilidad para la PDP
+      description: |
+        Lo que la página de producto muestra bajo el botón de compra. La fecha estimada se calcula
+        desde hoy con los días hábiles de entrega; el texto ya viene en español y listo para renderizar.
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          description: SKU del producto
+          schema:
+            type: string
+            pattern: '^MIRAGE-[A-Z0-9-]+$'
+          example: MIRAGE-MS-12K
+      responses:
+        '200':
+          description: Resumen para la PDP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSummary'
+              example:
+                sku: MIRAGE-MS-12K
+                inStock: true
+                stockLabel: En existencia
+                deliveryText: Recíbelo el miércoles 23 de septiembre
+                estimatedDeliveryDate: "2026-09-23"
+                lowStock: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    clientId:
+      type: apiKey
+      in: header
+      name: client_id
+    clientSecret:
+      type: apiKey
+      in: header
+      name: client_secret
+  schemas:
+    ProductSummary:
+      type: object
+      additionalProperties: false
+      required: [sku, inStock, stockLabel, lowStock]
+      properties:
+        sku:
+          type: string
+          example: MIRAGE-MS-12K
+        inStock:
+          type: boolean
+          example: true
+        stockLabel:
+          type: string
+          description: Texto listo para mostrar junto al botón de compra
+          example: En existencia
+        deliveryText:
+          type: string
+          description: Promesa de entrega en lenguaje natural; ausente si no hay stock
+          example: Recíbelo el miércoles 23 de septiembre
+        estimatedDeliveryDate:
+          type: string
+          format: date
+          description: Fecha estimada de entrega; ausente si no hay stock
+          example: "2026-09-23"
+        lowStock:
+          type: boolean
+          description: Quedan pocas unidades (menos de 5)
+          example: false
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: string
+          example: PRODUCT_NOT_FOUND
+        message:
+          type: string
+          example: No existe el producto MIRAGE-XX-99.
+        timestamp:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+  responses:
+    BadRequest:
+      description: SKU con formato inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_SKU_FORMAT
+            message: El SKU debe seguir el patrón MIRAGE-XX-NNN.
+            timestamp: "2026-09-21T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    Unauthorized:
+      description: Credenciales ausentes o inválidas
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Credenciales ausentes o inválidas.
+            timestamp: "2026-09-21T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    NotFound:
+      description: Producto inexistente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PRODUCT_NOT_FOUND
+            message: No existe el producto MIRAGE-XX-99.
+            timestamp: "2026-09-21T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    TooManyRequests:
+      description: Cuota excedida
+      headers:
+        Retry-After:
+          description: Segundos a esperar antes de reintentar
+          schema:
+            type: integer
+            example: 60
+          example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: QUOTA_EXCEEDED
+            message: Cuota excedida; reintenta en 60 segundos.
+            timestamp: "2026-09-21T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+    InternalError:
+      description: No fue posible obtener la información
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: SERVICE_UNAVAILABLE
+            message: No fue posible obtener la disponibilidad en este momento.
+            timestamp: "2026-09-21T12:00:00Z"
+            traceId: 8f2b6caf-b3c8-4515-ae3b-86b9c44c0285
+security:
+  - clientId: []
+    clientSecret: []
